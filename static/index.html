@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Image to Vocab v3</title>
+    <!-- Cropper.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: #fff;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        main {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-y: hidden;
+            position: relative;
+        }
+
+        .view {
+            display: none;
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+            flex-direction: column;
+            align-items: center;
+            overflow-y: auto;
+        }
+
+        .view.active {
+            display: flex;
+        }
+
+        /* Upload View */
+        .upload-section {
+            margin-top: 50px;
+            display: flex;
+            gap: 20px;
+            flex-direction: column;
+        }
+
+        .btn-large {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            width: 200px;
+            height: 120px;
+            border: 2px dashed #007bff;
+            border-radius: 12px;
+            background: white;
+            color: #007bff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .btn-large i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .btn-large input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* Editor Views */
+        #crop-container {
+            width: 100%;
+            height: 50vh;
+            background: #000;
+            margin-bottom: 10px;
+        }
+
+        #crop-image {
+            max-width: 100%;
+        }
+
+        #split-container {
+            position: relative;
+            width: 100%;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #split-image {
+            width: 100%;
+            display: block;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: filter 0.3s;
+        }
+
+        .enhanced {
+            filter: grayscale(100%) contrast(150%) brightness(90%);
+        }
+
+        .split-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: rgba(255, 0, 0, 0.7);
+            cursor: col-resize;
+            z-index: 10;
+        }
+
+        .split-handle {
+            position: absolute;
+            top: 50%;
+            left: -12px;
+            width: 28px;
+            height: 28px;
+            background-color: red;
+            border-radius: 50%;
+            z-index: 11;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .split-handle::after {
+            content: '<>';
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: none;
+            color: white;
+            background-color: #007bff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .secondary-btn {
+            background-color: #6c757d;
+        }
+
+        .action-btn {
+            background-color: #28a745;
+        }
+
+        .toggle-btn {
+            background-color: #17a2b8;
+        }
+
+        /* Result View */
+        .result-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .result-scroll {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            margin: 10px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+
+        /* Editable Cells */
+        td[contenteditable="true"] {
+            background-color: #fff;
+            cursor: text;
+        }
+
+        td[contenteditable="true"]:focus {
+            background-color: #e8f0fe;
+            outline: 2px solid #007bff;
+        }
+
+        /* Highlight potential errors? (future feature) */
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Image to Excel v3</h1>
+    </header>
+
+    <main>
+        <!-- View 1: Upload -->
+        <div id="view-upload" class="view active">
+            <p>Choose an option:</p>
+            <div class="upload-section">
+                <div class="btn-large">
+                    📷 Camera
+                    <input type="file" id="camera-input" accept="image/*" capture="environment">
+                </div>
+                <div class="btn-large">
+                    🖼️ Gallery
+                    <input type="file" id="gallery-input" accept="image/*">
+                </div>
+            </div>
+        </div>
+
+        <!-- View 2: Crop -->
+        <div id="view-crop" class="view">
+            <div id="crop-container">
+                <img id="crop-image" src="">
+            </div>
+            <div class="controls">
+                <button class="btn secondary-btn" onclick="resetApp()">Cancel</button>
+                <button class="btn" onclick="finishCrop()">Next: Split</button>
+            </div>
+        </div>
+
+        <!-- View 3: Split -->
+        <div id="view-split" class="view">
+            <p style="font-size:0.9em; margin: 5px 0;">Tap to add line. Drag handle to adjust.</p>
+            <div id="split-container">
+                <img id="split-image" src="">
+            </div>
+
+            <div class="controls">
+                <button class="btn toggle-btn" onclick="toggleEnhance()">👁️ Enhance Text</button>
+                <button class="btn secondary-btn" onclick="clearSplits()">Clear</button>
+                <button class="btn action-btn" onclick="processImage()">Convert</button>
+            </div>
+        </div>
+
+        <!-- View 4: Editor -->
+        <div id="view-result" class="view">
+            <div class="result-box">
+                <h2>Review & Edit</h2>
+                <p style="font-size: 0.8rem; color: #666;">Tap any cell to correct errors. Your edits train the system!
+                </p>
+
+                <div class="result-scroll">
+                    <table id="preview-table">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div class="controls">
+                    <button class="btn secondary-btn" onclick="resetApp()">Discard</button>
+                    <button class="btn action-btn" onclick="saveAndDownload()">Save & Download Excel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading"
+            style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.8); z-index:999; flex-direction:column; justify-content:center; align-items:center;">
+            <div style="font-size: 1.5rem; font-weight: bold;">Processing...</div>
+        </div>
+
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script>
+        let cropper;
+        let uploaedFile;
+        let croppedBlob;
+        let splitLines = [];
+        let draggingLine = null;
+
+        // State for save-result
+        let currentFileId = null;
+        let currentOriginalData = []; // To send back for learning
+
+        const cameraInput = document.getElementById('camera-input');
+        const galleryInput = document.getElementById('gallery-input');
+        const cropImage = document.getElementById('crop-image');
+        const splitImage = document.getElementById('split-image');
+        const splitContainer = document.getElementById('split-container');
+
+        // --- Handling Inputs ---
+        function handleFile(e) {
+            if (e.target.files && e.target.files[0]) {
+                uploaedFile = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    cropImage.src = event.target.result;
+                    switchView('view-crop');
+                    initCropper();
+                }
+                reader.readAsDataURL(uploaedFile);
+            }
+        }
+        cameraInput.addEventListener('change', handleFile);
+        galleryInput.addEventListener('change', handleFile);
+
+        // --- Crop & Split Logic (Same as v2) ---
+        function initCropper() {
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(cropImage, {
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 0.9,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: false,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+            });
+        }
+
+        function finishCrop() {
+            if (!cropper) return;
+            cropper.getCroppedCanvas().toBlob((blob) => {
+                croppedBlob = blob;
+                const url = URL.createObjectURL(blob);
+                splitImage.src = url;
+                clearSplits();
+                switchView('view-split');
+                suggestSplits(blob);
+            }, 'image/jpeg');
+        }
+
+        function toggleEnhance() { splitImage.classList.toggle('enhanced'); }
+
+        splitContainer.addEventListener('click', function (e) {
+            if (e.target.id === 'split-image' || e.target.id === 'split-container') {
+                addSplitLine(e.offsetX);
+            }
+        });
+
+        splitContainer.addEventListener('pointerdown', function (e) {
+            if (e.target.classList.contains('split-handle') || e.target.classList.contains('split-line')) {
+                draggingLine = e.target.classList.contains('split-line') ? e.target : e.target.parentElement;
+                draggingLine.setPointerCapture(e.pointerId);
+                e.preventDefault();
+            }
+        });
+
+        splitContainer.addEventListener('pointermove', function (e) {
+            if (draggingLine) {
+                e.preventDefault();
+                const rect = splitContainer.getBoundingClientRect();
+                let x = e.clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                draggingLine.style.left = x + 'px';
+            }
+        });
+
+        splitContainer.addEventListener('pointerup', function (e) {
+            if (draggingLine) {
+                draggingLine.releasePointerCapture(e.pointerId);
+                draggingLine = null;
+            }
+        });
+
+        function addSplitLine(x) {
+            const line = document.createElement('div');
+            line.className = 'split-line';
+            line.style.left = x + 'px';
+            const handle = document.createElement('div');
+            handle.className = 'split-handle';
+            line.appendChild(handle);
+            splitContainer.appendChild(line);
+            splitLines.push(line);
+        }
+
+        function addSplitLineByPercent(pct) {
+            const width = splitContainer.clientWidth;
+            const x = pct * width;
+            addSplitLine(x);
+        }
+
+        function clearSplits() {
+            document.querySelectorAll('.split-line').forEach(l => l.remove());
+            splitLines = [];
+        }
+
+        async function suggestSplits(blob) {
+            const formData = new FormData();
+            formData.append('file', blob, "query.jpg");
+            try {
+                const res = await fetch('/suggest-splits', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status === 'success' && data.splits && data.splits.length > 0) {
+                    data.splits.forEach(pct => addSplitLineByPercent(pct));
+                }
+            } catch (e) { console.error("Suggestion error", e); }
+        }
+
+        // --- Processing & Editor Logic ---
+
+        async function processImage() {
+            showLoading(true);
+            const renderWidth = splitImage.clientWidth;
+            const naturalWidth = splitImage.naturalWidth;
+            const ratio = naturalWidth / renderWidth;
+
+            const splits = Array.from(document.querySelectorAll('.split-line')).map(line => {
+                const cssLeft = parseFloat(line.style.left);
+                return Math.round(cssLeft * ratio);
+            });
+
+            const formData = new FormData();
+            formData.append('file', croppedBlob, "cropped.jpg");
+            formData.append('splits', JSON.stringify(splits));
+
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    currentFileId = data.file_id;
+                    currentOriginalData = data.original_for_learning; // Keep copy
+
+                    renderEditor(data.headers, data.data);
+                    switchView('view-result');
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (err) {
+                alert('Upload failed: ' + err);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function renderEditor(headers, rows) {
+            const tableHead = document.querySelector('#preview-table thead');
+            const tableBody = document.querySelector('#preview-table tbody');
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            // Headers
+            const trHead = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                trHead.appendChild(th);
+            });
+            tableHead.appendChild(trHead);
+
+            // Body with ContentEditable
+            rows.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(h => {
+                    const td = document.createElement('td');
+                    td.textContent = row[h] || "";
+                    td.contentEditable = true; // Enable Editing!
+                    td.dataset.header = h; // Store header name to reconstruct JSON
+                    tr.appendChild(td);
+                });
+                tableBody.appendChild(tr);
+            });
+        }
+
+        async function saveAndDownload() {
+            showLoading(true);
+
+            // Scrape table data
+            const tableBody = document.querySelector('#preview-table tbody');
+            const rows = tableBody.querySelectorAll('tr');
+            const correctedData = [];
+
+            rows.forEach(tr => {
+                const rowObj = {};
+                tr.querySelectorAll('td').forEach(td => {
+                    const header = td.dataset.header;
+                    rowObj[header] = td.innerText; // Get edited text
+                });
+                correctedData.push(rowObj);
+            });
+
+            // Send to backend
+            try {
+                const res = await fetch('/save-result', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        file_id: currentFileId,
+                        corrected_data: correctedData,
+                        original_data: currentOriginalData
+                    })
+                });
+
+                const data = await res.json();
+                if (data.status === 'success') {
+                    // Trigger download
+                    window.location.href = data.download_url;
+                    alert('Saved! Learning updated.');
+                } else {
+                    alert('Save error: ' + data.message);
+                }
+            } catch (e) {
+                alert('Save failed: ' + e);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function switchView(id) {
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function resetApp() { location.reload(); }
+        function showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
+
+    </script>
+</body>
+
+</html>

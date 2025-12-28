@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+pytesseract
+pandas
+openpyxl
+Pillow
+ImageHash
+numpy
+
